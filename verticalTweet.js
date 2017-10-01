@@ -10,8 +10,6 @@ var LEFT_TOP_CORNER_STRING = "┏━",
     INNER_BORDER_STRING = "│",
     EMPTY_SPACE = "　";
 
-var options = {};
-
 function getVerticalTweet(src, options) {
     var tweet = "",
         defaultOptions = {
@@ -19,14 +17,22 @@ function getVerticalTweet(src, options) {
             col: 15
         };
 
+    if (options.row) {
+        defaultOptions.row = options.row;
+    }
+    if (options.col) {
+        defaultOptions.col = options.col;
+    }
+
     tweet += getTopString(defaultOptions.row);
 
-    src = src.split("（").join("︵");
-    src = src.split("）").join("︶");
+    src = turnToFullWidthCharacter(src);
+
+    src = replaceCharacter(src);
 
     // handle user options later.
     if (src.length <= defaultOptions.col * defaultOptions.row) {
-        var columnArray = getColumnArray(src.split(""), defaultOptions);
+        var columnArray = getColumnArray(src, defaultOptions);
         columnArray.reverse();
 
         for (var i = 0; i < defaultOptions.col; i++) {
@@ -34,25 +40,37 @@ function getVerticalTweet(src, options) {
             for (var j = 0; j < defaultOptions.row; j++) {
                 tweet += columnArray[j][i] + (j + 1 == defaultOptions.row ? "" : INNER_BORDER_STRING);
             }
-            tweet += (OUTER_BORDER_STRING + "\n");
+            tweet += (OUTER_BORDER_STRING + "\r\n");
         }
 
         tweet += getBottomString(defaultOptions.row);
 
         return tweet;
     } else {
-        return "超出" + (src.length - defaultOptions.col * defaultOptions.row) + "个字数";
+        return "超出" + (src.length - defaultOptions.col * defaultOptions.row) + "个字";
     }
-
-
 }
 
-function getColumnArray(arr, options) {
+function getColumnArray(str, options) {
     var _array = [];
 
-    while (arr.length) {
-        _array.push(arr.splice(0, options.col));
+    var lines = [];
+    if (str.indexOf("\r\n") > -1) {
+        lines = lines.concat(str.split("\r\n"));
+    } else if (str.indexOf("\n") > -1) {
+        lines = lines.concat(str.split("\n"));
+    } else {
+        lines.push(str);
     }
+
+    lines.forEach(function(line) {
+        var arr = line.split("");
+
+        while (arr.length) {
+            _array.push(arr.splice(0, options.col));
+        }
+
+    })
 
     while (_array.length < options.row) {
         _array.push([]);
@@ -62,8 +80,7 @@ function getColumnArray(arr, options) {
         while (col.length < options.col) {
             col.push(EMPTY_SPACE);
         }
-    });
-
+    })
     return _array;
 }
 
@@ -73,7 +90,7 @@ function getTopString(row) {
         str += TOP_BORDER_CONNECT_STRING;
     }
     str += RIGHT_TOP_CORNER_STRING;
-    str += "\n";
+    str += "\r\n";
     return str;
 }
 
@@ -86,7 +103,45 @@ function getBottomString(row) {
     return str;
 }
 
-fs.writeFile("tweet.txt", getVerticalTweet("刚刚起床的时候看到时间线上有人这么发微博，觉得挺好玩就写了生成这个排版的小程序哈哈哈。不过现在只能支持中文的排版，因为英文会乱掉，不好看（而且只能在手机上看效果才好）。好了，我差不多要出去吃饭了。优不优化的以后再说，假期快乐！"), function(err) {
-    if (!err)
-        console.log("DONE");
-});
+function replaceCharacter(str) {
+    var _str = str;
+
+    _str = _str.split("（").join("︵");
+    _str = _str.split("）").join("︶");
+    _str = _str.split("“").join("﹃");
+    _str = _str.split("”").join("﹄");
+    _str = _str.split("‘").join("﹁");
+    _str = _str.split("’").join("﹂");
+    _str = _str.split("《").join("︽");
+    _str = _str.split("》").join("︾");
+
+    return _str;
+}
+
+function turnToFullWidthCharacter(str) {
+    var result = "";
+    var charlist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    charlist += "abcdefghijklmnopqrstuvwxyz";
+    charlist += "0123456789";
+    charlist += " `~!@#$%^&*()_+-={}|[]:\";'<>?,./";
+    for (var i = 0; i < str.length; i++) {
+        var c1 = str.charAt(i);
+        var c2 = str.charCodeAt(i);
+        if (charlist.indexOf(c1) > -1) {
+            if (" " == c1) {
+                result += "　";
+            } else {
+                result += String.fromCharCode(str.charCodeAt(i) + 65248);
+            }
+        } else {
+            result += String.fromCharCode(str.charCodeAt(i));
+        }
+    }
+    return result;
+}
+
+var in_str = fs.readFileSync("in.txt", "utf8");
+console.log(in_str);
+fs.writeFile("out.txt", getVerticalTweet(in_str, { row: 6, col: 15 }), function(err) {
+    !err && console.log("DONE");
+})
